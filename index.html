@@ -1,20 +1,51 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>최종 PDF OCR</title>
+  <meta charset="UTF-8" />
+  <title>부채 분석 OCR 웹앱</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h2>최종 PDF OCR 테스트</h2>
+  <h1>PDF OCR 부채 자동 분석</h1>
 
-  <input type="file" id="pdfInput" accept="application/pdf">
-  <pre id="output"></pre>
+  <p>
+    <input type="file" id="fileInput" accept="application/pdf,image/*" />
+    <button id="runBtn">OCR 실행</button>
+  </p>
 
-  <!-- PDF.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <div class="small">
+    - PDF 또는 이미지 선택 후 "OCR 실행"<br>
+    - 브라우저에서만 동작 (Tesseract.js + pdf.js)
+  </div>
+
+  <h3>로그</h3>
+  <div id="log"></div>
+
+  <h3>부채 리스트 (자동 추출)</h3>
+  <table id="debtTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>유형</th>
+        <th>기관명</th>
+        <th>코드</th>
+        <th>발생일</th>
+        <th>해제/만기일</th>
+        <th>등록금액</th>
+        <th>연체금액</th>
+        <th>흐름</th>
+        <th>원문</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <canvas id="pdfCanvas"></canvas>
 
   <!-- Tesseract.js -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- pdf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
 
   <script src="app.js"></script>
 </body>
