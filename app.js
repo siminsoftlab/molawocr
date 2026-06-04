@@ -58,24 +58,38 @@ async function ocrPdf(file) {
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
   let fullText = '';
+
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     log(`페이지 ${pageNum} OCR 중...`);
 
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 });
+    const viewport = page.getViewport({ scale: 3.5 }); // 🔥 고해상도
 
     pdfCanvas.width = viewport.width;
     pdfCanvas.height = viewport.height;
 
     await page.render({ canvasContext: pdfCtx, viewport }).promise;
 
-    const dataUrl = pdfCanvas.toDataURL('image/png');
-    const { data: { text } } = await Tesseract.recognize(dataUrl, 'kor+eng');
+    // 🔥 흑백 + 대비 강화
+    const img = pdfCtx.getImageData(0, 0, pdfCanvas.width, pdfCanvas.height);
+    const data = img.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+      const v = avg > 150 ? 255 : 0;
+      data[i] = data[i+1] = data[i+2] = v;
+    }
+    pdfCtx.putImageData(img, 0, 0);
+
+    const dataUrl = pdfCanvas.toDataURL("image/png");
+
+    const { data: { text } } = await Tesseract.recognize(dataUrl, "kor+eng", {
+      tessedit_pageseg_mode: 6,
+      logger: m => log(`p${pageNum} 진행률: ${Math.round(m.progress * 100)}%`)
+    });
 
     fullText += `\n=== PAGE ${pageNum} ===\n` + text;
   }
 
-  log('PDF OCR 완료');
   return fullText;
 }
 
@@ -224,4 +238,56 @@ function calculateTotals(debts) {
   });
 
   return totals;
+}
+/**
+렌더링 함수
+**/
+function renderTotals(totals) {
+  const tbody = document.querySelector("#sumTable tbody");
+  tbody.innerHTML = "";
+
+  Object.keys(totals).forEach(inst => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${inst}</td>
+      <td>${totals[inst].registered.toLocaleString()}</td>
+      <td>${totals[inst].overdue.toLocaleString()}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+/**
+그래프 함수
+**/
+let chart;
+
+function renderChart(totals) {
+  const labels = Object.keys(totals);
+  const registered = labels.map(k => totals[k].registered);
+  const overdue = labels.map(k => totals[k].overdue);
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById("chart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "등록금액",
+          data: registered,
+          backgroundColor: "rgba(54, 162, 235, 0.6)"
+        },
+        {
+          label: "연체금액",
+          data: overdue,
+          backgroundColor: "rgba(255, 99, 132, 0.6)"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true } }
+    }
+  });
 }
