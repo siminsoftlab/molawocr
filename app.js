@@ -209,3 +209,19 @@ function downloadExcel(debts) {
 document.getElementById("excelBtn").addEventListener("click", () => {
   downloadExcel(window._debts || []);
 });
+/**
+기관별 합계 자동 계산 기능
+*//
+function calculateTotals(debts) {
+  const totals = {};
+
+  debts.forEach(d => {
+    const inst = d.institution || "기타";
+    if (!totals[inst]) totals[inst] = { registered: 0, overdue: 0 };
+
+    totals[inst].registered += Number(d.amountRegistered || 0);
+    totals[inst].overdue += Number(d.amountOverdue || 0);
+  });
+
+  return totals;
+}
