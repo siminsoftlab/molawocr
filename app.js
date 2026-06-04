@@ -1,15 +1,28 @@
+// =========================
+// 기본 DOM 요소
+// =========================
 const logEl = document.getElementById('log');
 const fileInput = document.getElementById('fileInput');
 const runBtn = document.getElementById('runBtn');
+const excelBtn = document.getElementById('excelBtn');
 const debtTableBody = document.querySelector('#debtTable tbody');
 const pdfCanvas = document.getElementById('pdfCanvas');
 const pdfCtx = pdfCanvas.getContext('2d');
 
+let chart; // Chart.js 그래프 저장용
+window._debts = []; // 엑셀 다운로드용 전역 저장
+
+// =========================
+// 로그 출력
+// =========================
 function log(msg) {
   console.log(msg);
   logEl.textContent += msg + "\n";
 }
 
+// =========================
+// OCR 실행 버튼
+// =========================
 runBtn.addEventListener('click', async () => {
   const file = fileInput.files && fileInput.files[0];
   if (!file) {
@@ -37,11 +50,23 @@ runBtn.addEventListener('click', async () => {
   const debts = parseDebts(fullText);
   const flows = inferFlows(debts);
 
-  renderDebtTable(debts, flows);
+  // 흐름 정보 저장
+  debts.forEach((d, i) => d.flow = flows.get(i) || "");
+
+  window._debts = debts;
+
+  renderDebtTable(debts);
+
+  const totals = calculateTotals(debts);
+  renderTotals(totals);
+  renderChart(totals);
+
   log("\n부채 항목 수: " + debts.length);
 });
 
+// =========================
 // 이미지 OCR
+// =========================
 async function ocrImage(file) {
   log('이미지 OCR 시작...');
   const url = URL.createObjectURL(file);
@@ -51,7 +76,9 @@ async function ocrImage(file) {
   return text;
 }
 
-// PDF OCR
+// =========================
+// PDF OCR (고해상도 + 전처리)
+// =========================
 async function ocrPdf(file) {
   log('PDF OCR 시작...');
   const arrayBuffer = await file.arrayBuffer();
@@ -93,7 +120,9 @@ async function ocrPdf(file) {
   return fullText;
 }
 
-// 부채 자동 추출
+// =========================
+// 부채 자동 추출 알고리즘
+// =========================
 function parseDebts(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const debts = [];
@@ -147,7 +176,9 @@ function detectType(line) {
   return null;
 }
 
-// 흐름 추정
+// =========================
+// 흐름 추정 (연체 → 해제)
+// =========================
 function inferFlows(debts) {
   const flows = new Map();
   const byAmount = {};
@@ -176,8 +207,12 @@ function inferFlows(debts) {
   return flows;
 }
 
-// 표 렌더링
-function renderDebtTable(debts, flows) {
+// =========================
+// 부채 테이블 렌더링
+// =========================
+function renderDebtTable(debts) {
+  debtTableBody.innerHTML = "";
+
   debts.forEach((d, i) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -187,45 +222,18 @@ function renderDebtTable(debts, flows) {
       <td>${d.code}</td>
       <td>${d.date1}</td>
       <td>${d.date2}</td>
-      <td>${d.amountRegistered}</td>
-      <td>${d.amountOverdue}</td>
-      <td>${flows.get(i) || ''}</td>
+      <td>${Number(d.amountRegistered).toLocaleString()}</td>
+      <td>${Number(d.amountOverdue).toLocaleString()}</td>
+      <td>${d.flow || ''}</td>
       <td>${d.raw}</td>
     `;
     debtTableBody.appendChild(tr);
   });
 }
-function downloadExcel(debts) {
-  const wsData = [
-    ["유형", "기관명", "코드", "발생일", "해제일", "등록금액", "연체금액", "흐름", "원문"]
-  ];
 
-  debts.forEach(d => {
-    wsData.push([
-      d.type,
-      d.institution,
-      d.code,
-      d.date1,
-      d.date2,
-      d.amountRegistered,
-      d.amountOverdue,
-      d.flow || "",
-      d.raw
-    ]);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "부채리스트");
-
-  XLSX.writeFile(wb, "부채_분석.xlsx");
-}
-document.getElementById("excelBtn").addEventListener("click", () => {
-  downloadExcel(window._debts || []);
-});
-/**
-기관별 합계 자동 계산 기능
-*//
+// =========================
+// 기관별 합계 계산
+// =========================
 function calculateTotals(debts) {
   const totals = {};
 
@@ -239,9 +247,10 @@ function calculateTotals(debts) {
 
   return totals;
 }
-/**
-렌더링 함수
-**/
+
+// =========================
+// 기관별 합계 테이블 렌더링
+// =========================
 function renderTotals(totals) {
   const tbody = document.querySelector("#sumTable tbody");
   tbody.innerHTML = "";
@@ -256,11 +265,10 @@ function renderTotals(totals) {
     tbody.appendChild(tr);
   });
 }
-/**
-그래프 함수
-**/
-let chart;
 
+// =========================
+// Chart.js 그래프
+// =========================
 function renderChart(totals) {
   const labels = Object.keys(totals);
   const registered = labels.map(k => totals[k].registered);
@@ -290,4 +298,37 @@ function renderChart(totals) {
       scales: { y: { beginAtZero: true } }
     }
   });
+}
+
+// =========================
+// 엑셀 다운로드
+// =========================
+excelBtn.addEventListener("click", () => {
+  downloadExcel(window._debts || []);
+});
+
+function downloadExcel(debts) {
+  const wsData = [
+    ["유형", "기관명", "코드", "발생일", "해제일", "등록금액", "연체금액", "흐름", "원문"]
+  ];
+
+  debts.forEach(d => {
+    wsData.push([
+      d.type,
+      d.institution,
+      d.code,
+      d.date1,
+      d.date2,
+      d.amountRegistered,
+      d.amountOverdue,
+      d.flow || "",
+      d.raw
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "부채리스트");
+
+  XLSX.writeFile(wb, "부채_분석.xlsx");
 }
