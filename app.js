@@ -181,3 +181,28 @@ function renderDebtTable(debts, flows) {
     debtTableBody.appendChild(tr);
   });
 }
+function downloadExcel(debts) {
+  const wsData = [
+    ["유형", "기관명", "코드", "발생일", "해제일", "등록금액", "연체금액", "흐름", "원문"]
+  ];
+
+  debts.forEach(d => {
+    wsData.push([
+      d.type,
+      d.institution,
+      d.code,
+      d.date1,
+      d.date2,
+      d.amountRegistered,
+      d.amountOverdue,
+      d.flow || "",
+      d.raw
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "부채리스트");
+
+  XLSX.writeFile(wb, "부채_분석.xlsx");
+}
