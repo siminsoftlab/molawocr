@@ -206,3 +206,6 @@ function downloadExcel(debts) {
 
   XLSX.writeFile(wb, "부채_분석.xlsx");
 }
+document.getElementById("excelBtn").addEventListener("click", () => {
+  downloadExcel(window._debts || []);
+});
